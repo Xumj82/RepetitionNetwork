@@ -45,7 +45,7 @@ train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
 #check point
-ckpt_path = 'chk_point/'+current_time
+new_ckpt_path = './chk_point/'+current_time
 
 # 根据y计算分类矩阵，考虑到y是每一帧图像所预测到的重复动作的周期（1 ~ 32） 使用one-hot编码得到 64*32 矩阵
 def get_periodicity(y):   
@@ -161,11 +161,14 @@ def start_train(
                 tf.summary.scalar('reg_loss', test_reg_loss.result(), step=epoch)
         
         #save check point
-        model.save_weights(ckpt_path,overwrite=True)
+        if ckpt_path:
+            model.save_weights(ckpt_path,overwrite=True)
+        else:
+            model.save_weights(new_ckpt_path,overwrite=True)
     # save model
     # module_no_signatures_path = os.path.join('./saved_model/', 'module_no_signatures')
     # print('Saving model...')
     # tf.saved_model.save(model, module_no_signatures_path)
 
-start_train(epochs=100, batch_size=2, train_sample_number=500, val_sample_number=20)
+start_train(epochs=100, batch_size=2, train_sample_number=10, val_sample_number=2)
 
