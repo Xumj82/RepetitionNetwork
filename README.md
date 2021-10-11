@@ -17,3 +17,5 @@ tensorboard --logdir logs/gradient_tape
 ```
 An existing log file at [here](https://drive.google.com/drive/folders/17jyIB8sAVINg25L368PVJifMOxjfdUa2?usp=sharing)
 
+![Scalars](/assets/scalars.png)
+![Sim_mitrix](/assets/sim_mitrix.png)
