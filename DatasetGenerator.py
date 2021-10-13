@@ -24,22 +24,23 @@ def _int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
-def video_example(video, label):
+def video_example(video, y1, y2):
   feature = {
       'video':_bytes_feature(video),
-      'label':_bytes_feature(label),
+      'periodicity':_bytes_feature(y1),
+      'with_in_period':_bytes_feature(y2),
   }
 
   return tf.train.Example(features=tf.train.Features(feature=feature))
 
-def prepare_data(sample_number=4332):
+def prepare_train_data(sample_number=4332):
     train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(sample_number).prefetch(tf.data.AUTOTUNE)
     record_file = './data/train.tfrecords'
 
     with tf.io.TFRecordWriter(record_file) as writer:
         with tqdm(total=sample_number) as pbar:
-            for x, y in train_dataset:
-                tf_example = video_example(x, y)
+            for x, y1, y2 in train_dataset:
+                tf_example = video_example(x, y1, y2)
                 writer.write(tf_example.SerializeToString())
                 pbar.update(1)
 

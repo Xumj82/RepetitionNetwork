@@ -10,6 +10,20 @@ import random
 from random import randint
 import tensorflow as tf
 
+def get_periodicity(y):   
+    y = tf.round(y)-1
+    y = tf.squeeze(y, axis=-1, name=None).numpy()
+    periodicity_mitrixs  = tf.one_hot(y, 32,
+           on_value=1.0, off_value=0.0,
+           axis=-1)
+
+    return periodicity_mitrixs
+
+# 根据y计算回归矩阵，y=0 则为0， y>0 则为1
+def get_with_in_period(y):
+    y = tf.where(tf.math.greater(y, 1), 1, y)
+    return y
+
 def get_frames(path):
     frames = []
     cap = cv2.VideoCapture(path)
@@ -59,12 +73,11 @@ def get_combined_video(path,count):
         finalFrames.extend( newRandFrames[a:] )
     X = []
     for img in finalFrames:
-        img_tensor = tf.convert_to_tensor(img)
+        img_tensor = tf.convert_to_tensor(img,dtype=tf.float64)
         img_tensor = tf.image.resize(img_tensor, [112, 112])
         img_tensor = tf.cast(img_tensor, tf.float32)
         img_tensor = img_tensor / 255.0
         X.append(img_tensor)
-    X = X
 
     y = [0 for i in range(0,a)]
     y.extend([output_len/count if 1<output_len/count<32 else 0 for i in range(0, output_len)])
@@ -72,8 +85,10 @@ def get_combined_video(path,count):
     y.extend( [ 0 for i in range(0, b)] )
     y = tf.convert_to_tensor(y)
     y = tf.expand_dims(y, -1)
-   
-    return X, y
+    y1 = get_periodicity(y)
+    y2 = get_with_in_period(y)
+
+    return X, y1, y2
 # contix labeled repetition videos(64 frames)
 class CombinedDataset(tf.data.Dataset):
     def _generator(vidoe_path_list,countix):
@@ -81,8 +96,8 @@ class CombinedDataset(tf.data.Dataset):
         
         while i < len(vidoe_path_list):
             # Reading data (line, record) from the file
-            X,y = get_combined_video(vidoe_path_list[i],countix[i])
-            yield X,y
+            X,y1,y2 = get_combined_video(vidoe_path_list[i],countix[i])
+            yield X,y1,y2
             i += 1
 
     def __new__(cls, video_path, countix_path):
@@ -99,7 +114,8 @@ class CombinedDataset(tf.data.Dataset):
         dataset = tf.data.Dataset.from_generator(
             cls._generator,
             output_signature = (
-                tf.TensorSpec(shape = (64, 112, 112, 3), dtype = tf.float32),
+                tf.TensorSpec(shape = (64, 112, 112, 3), dtype = tf.float64),
+                tf.TensorSpec(shape=(64,32), dtype=tf.float64),
                 tf.TensorSpec(shape=(64,1), dtype=tf.float64),
                 ),
             args=[all_video_path,countix]
@@ -242,10 +258,4 @@ class SyntheticDataset(tf.data.Dataset):
             args=[path,sample_size]
         )
         # dataset = tf.data.Dataset.zip((video_dataset, label_dataset))
-        return dataset
-
-class TrainDataset(tf.data.Dataset):
-    def __new__(cls, path):
-        # raw_data = open(path, "rb")
-        dataset =  tf.data.TFRecordDataset(filenames = path)
         return dataset
