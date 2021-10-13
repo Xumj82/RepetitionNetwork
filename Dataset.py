@@ -244,3 +244,8 @@ class SyntheticDataset(tf.data.Dataset):
         # dataset = tf.data.Dataset.zip((video_dataset, label_dataset))
         return dataset
 
+class TrainDataset(tf.data.Dataset):
+    def __new__(cls, path):
+        # raw_data = open(path, "rb")
+        dataset =  tf.data.TFRecordDataset(filenames = path)
+        return dataset

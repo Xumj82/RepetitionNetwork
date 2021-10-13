@@ -170,5 +170,5 @@ def start_train(
     # print('Saving model...')
     # tf.saved_model.save(model, module_no_signatures_path)
 
-start_train(epochs=100, batch_size=2, train_sample_number=10, val_sample_number=2)
+start_train(epochs=100, batch_size=3, train_sample_number=90, val_sample_number=3)
 

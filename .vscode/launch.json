@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "tfrecord",
+            "type": "python",
+            "request": "launch",
+            "program": "./DatasetGenerator.py",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "predict",
             "type": "python",
             "request": "launch",
