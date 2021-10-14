@@ -89,7 +89,7 @@ def save_video(path,frames):
         i+=1
     cv2.destroyAllWindows()
 
-PATH_TO_CKPT = './chk_point/'
+PATH_TO_CKPT = './chk_point/20211014-160609/'
 
 ##@title 
 

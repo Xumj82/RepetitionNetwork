@@ -147,7 +147,7 @@ class ResnetPeriodEstimator(Model):
           channels, kernel_regularizer=regularizers.l2(self.l2_reg_weight),
           activation=tf.nn.relu))
     self.fc_layers.append(layers.Dense(
-        num_preds,activation=tf.nn.softmax,kernel_regularizer=regularizers.l2(self.l2_reg_weight)))
+        num_preds,kernel_regularizer=regularizers.l2(self.l2_reg_weight)))
 
     # Within Period Module
     num_preds = 1

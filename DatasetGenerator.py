@@ -34,7 +34,9 @@ def video_example(video, y1, y2):
   return tf.train.Example(features=tf.train.Features(feature=feature))
 
 def prepare_train_data(sample_number=4332):
-    train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(sample_number).prefetch(tf.data.AUTOTUNE)
+    train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(sample_number)
+    synthetic_dataset = SyntheticDataset(path='./data/synthvids/',sample_size = 3000)
+    train_dataset = train_dataset.concatenate(synthetic_dataset).prefetch(tf.data.AUTOTUNE)
     record_file = './data/train.tfrecords'
 
     with tf.io.TFRecordWriter(record_file) as writer:
@@ -54,3 +56,5 @@ def prepare_test_data(sample_number=2554):
                 tf_example = video_example(x, y)
                 writer.write(tf_example.SerializeToString())
                 pbar.update(1)
+
+prepare_train_data()

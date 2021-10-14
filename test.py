@@ -22,7 +22,7 @@ def _parse_image_function(example_proto):
   y2 = tf.io.parse_tensor(example_message['with_in_period'], out_type=tf.float64)
   return x, y1, y2
 
-train_dataset = tf.data.TFRecordDataset(filenames = './data/train.tfrecords').map(_parse_image_function)
+train_dataset = tf.data.TFRecordDataset(filenames = './data/train.tfrecords').map(_parse_image_function).batch(2)
 
 for x,y1,y2 in train_dataset:
     # video_raw = video_features['video'].numpy()

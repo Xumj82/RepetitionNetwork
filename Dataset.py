@@ -216,7 +216,7 @@ def get_rep_video(path):
     for img in finalFrames:
         img_tensor = tf.convert_to_tensor(img)
         img_tensor = tf.image.resize(img_tensor, [112, 112])
-        img_tensor = tf.cast(img_tensor, tf.float32)
+        img_tensor = tf.cast(img_tensor, tf.float64)
         img_tensor = img_tensor / 255.0
         frames.append(img_tensor)
     
@@ -228,17 +228,20 @@ def get_rep_video(path):
     #assert(len(frames) == 64)
     
     #frames = F.dropout(frames, p = 0.1)
-    X = tf.expand_dims(frames, axis=0)
+    X = frames
     y = tf.convert_to_tensor(periodLength)
-    return X, y
+    y1 = get_periodicity(y)
+    y2 = get_with_in_period(y)
+    return X, y1, y2
+
 # Systhetic repetition videos(64 frames)
 class SyntheticDataset(tf.data.Dataset):
     def _generator(path,sample_size):
         i = 0
         while i <sample_size:
             # Reading data (line, record) from the file
-            X,y = get_rep_video(path)
-            yield X,y
+            X,y1,y2 = get_rep_video(path)
+            yield X,y1,y2
             i += 1
 
     def __new__(cls, path,sample_size):
@@ -252,8 +255,9 @@ class SyntheticDataset(tf.data.Dataset):
         dataset = tf.data.Dataset.from_generator(
             cls._generator,
             output_signature = (
-                tf.TensorSpec(shape = (64, 112, 112, 3), dtype = tf.float32),
-                tf.TensorSpec(shape=(64, 1), dtype=tf.float64),
+                tf.TensorSpec(shape = (64, 112, 112, 3), dtype = tf.float64),
+                tf.TensorSpec(shape=(64,32), dtype=tf.float64),
+                tf.TensorSpec(shape=(64,1), dtype=tf.float64),
                 ),
             args=[path,sample_size]
         )

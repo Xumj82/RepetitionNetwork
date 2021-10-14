@@ -62,52 +62,50 @@ def get_with_in_period(y):
     y = tf.where(tf.math.greater(y, 1), 1, y)
     return y
 
-def train_step(model, optimizer, x_train, y_train):
+def train_step(model, optimizer, x_train, y1_train, y2_train):
     # Open a GradientTape to record the operations run
     # during the forward pass, which enables auto-differentiation.
     with tf.GradientTape() as tape:
         # Get y1(one-hot classification) and y2(regression) by y_train
-        y1 = get_periodicity(y_train)
-        y2 = get_with_in_period(y_train)
         # Run the forward pass of the layer.
         # The operations that the layer applies
         # to its inputs are going to be recorded
         # on the GradientTape.
         y1pred, y2pred, sim = model(x_train)
 
-        loss1 = cce(y1, y1pred)
-        loss2 = bce(y2, y2pred)
-        loss_value = loss1 + 5*loss2 # 不确定是否用5， 但总体来说loss1是loss2的5倍
+        # loss1 = cce(y1_train, y1pred)
+        loss1 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y1_train, y1pred))
+        loss2 = bce(y2_train, y2pred)
+        # loss2 = tf.nn.sigmoid_cross_entropy_with_logits(y2_train, y2pred)
+        loss_value = (loss1 + loss2)/2 # 不确定是否用5， 但总体来说loss1是loss2的5倍
         
     # Use the gradient tape to automatically retrieve
     # the gradients of the trainable variables with respect to the loss.
-    grads = tape.gradient(loss_value, model.trainable_weights)
+    grads = tape.gradient([loss1,loss2], model.trainable_weights)
 
     # Run one step of gradient descent by updating
     # the value of the variables to minimize the loss.
     optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
     # Calculate accuracy and loss metric
-    train_cls_acc_metric.update_state(y1, y1pred)
-    train_reg_acc_metric.update_state(y2, y2pred)
+    train_cls_acc_metric.update_state(y1_train, y1pred)
+    train_reg_acc_metric.update_state(y2_train, y2pred)
     train_cls_loss.update_state(loss1)
     train_reg_loss.update_state(loss2)
 
     return sim
 
-def test_step(model, x_test, y_test):
-
-    y1_test = get_periodicity(y_test)
-    y2_test = get_with_in_period(y_test)
+def test_step(model, x_test, y1_test, y2_test):
 
     y1_pred_test, y2_pred_test, sim_val = model(x_test, training=False)
 
-    loss1_test = cce(y1_test, y1_pred_test)
+    # loss1_test = cce(y1_test, y1_pred_test)
+    loss1_test = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y1_test, y1_pred_test))
     loss2_test = bce(y2_test, y2_pred_test)
-
+    # loss2_test = tf.nn.sigmoid_cross_entropy_with_logits(y2_test, y2_pred_test)
     # Update val metrics
     test_cls_acc_metric.update_state(y1_test, y1_pred_test)
-    test_reg_acc_metric.update_state(y1_test, y2_pred_test)
+    test_reg_acc_metric.update_state(y2_test, y2_pred_test)
     test_cls_loss.update_state(loss1_test)
     test_reg_loss.update_state(loss2_test)
 
@@ -121,22 +119,26 @@ def start_train(
     ckpt_path = None
     ):
     model = ResnetPeriodEstimator()
+    model.built = True
     if ckpt_path:
         model.load_weights(ckpt_path)
     # Instantiate an optimizer.
-    optimizer = keras.optimizers.Adam()
+    optimizer = keras.optimizers.Adam(learning_rate=6e-6)
     # Prepare the training dataset.
-    train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(train_sample_number).batch(batch_size)
+    train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(1000)
+    synthetic_dataset = SyntheticDataset(path='./data/synthvids/',sample_size = train_sample_number-1000)
+    train_dataset = synthetic_dataset.concatenate(train_dataset).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    # train_dataset = CombinedDataset('./data/trainvids/','./countix/countix_train.csv').take(train_sample_number).batch(batch_size)
     # Prepare the validation dataset.
-    val_dataset = CombinedDataset('./data/testvids/','./countix/countix_test.csv').take(val_sample_number).batch(batch_size)
+    val_dataset = CombinedDataset('./data/testvids/','./countix/countix_test.csv').take(val_sample_number).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch+1,))
         # tf.summary.trace_on(graph=True)
         # Iterate over the batches of the dataset.
         with tqdm(total=train_sample_number+val_sample_number) as pbar:
-            for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
-                sim_img = train_step(model, optimizer, x_batch_train, y_batch_train)
+            for step, (x_batch_train, y1_batch_train,y2_batch_train) in enumerate(train_dataset):
+                sim_img = train_step(model, optimizer, x_batch_train, y1_batch_train, y2_batch_train)
                 pbar.update(batch_size)
         
             with train_summary_writer.as_default():
@@ -148,8 +150,8 @@ def start_train(
                 tf.summary.scalar('reg_loss', train_reg_loss.result(), step=epoch)
 
             # Run a validation loop at the end of each epoch.        
-            for x_batch_val, y_batch_val in val_dataset:
-                sim_img_test = test_step(model, x_batch_val, y_batch_val)
+            for x_batch_val, y1_batch_val, y2_batch_val in val_dataset:
+                sim_img_test = test_step(model, x_batch_val, y1_batch_val, y2_batch_val)
                 pbar.update(batch_size)
 
             with test_summary_writer.as_default():
@@ -161,14 +163,11 @@ def start_train(
                 tf.summary.scalar('reg_loss', test_reg_loss.result(), step=epoch)
         
         #save check point
-        if ckpt_path:
-            model.save_weights(ckpt_path,overwrite=True)
-        else:
-            model.save_weights(new_ckpt_path,overwrite=True)
+        model.save_weights(new_ckpt_path,overwrite=True)
     # save model
     # module_no_signatures_path = os.path.join('./saved_model/', 'module_no_signatures')
     # print('Saving model...')
     # tf.saved_model.save(model, module_no_signatures_path)
 
-start_train(epochs=100, batch_size=3, train_sample_number=90, val_sample_number=3)
+start_train(epochs=10, batch_size=2, train_sample_number=2000, val_sample_number=200, ckpt_path='./chk_point/20211014-160609/20211014-160609')
 
